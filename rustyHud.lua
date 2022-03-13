@@ -4,15 +4,20 @@ local imgui = require 'mimgui'
 local vkeys = require 'vkeys'
 local wm = require 'windows.message'
 local fa = require 'fAwesome5'
+local memory = require 'memory'
 
 local new = imgui.new
-local hudWindow = new.bool()
+local hudWindow, weaponWindow = new.bool(), new.bool()
 local sizeX, sizeY = getScreenResolution()
+local weapons, slots = {}, {}
 local satiety = 0
 local satietyCheck = false
 
 imgui.OnInitialize(function()
     styleInit()
+    for i = 0, 46 do
+        weapons[i] = imgui.CreateTextureFromFile(getWorkingDirectory().."/resource/RustyHUD/weapons/"..i..".png")
+    end
     local config = imgui.ImFontConfig()
     config.MergeMode = true
     local glyph_ranges_icon = imgui.GetIO().Fonts:GetGlyphRangesCyrillic()
@@ -25,13 +30,71 @@ end)
 
 function main()
     while not isSampAvailable() do wait(0) end
-    hudWindow[0] = true
-    displayHud(false)
+    hudWindow[0], weaponWindow[0] = true, true
+    displayHud(true)
+    for i = 1, 13 do
+        weapon, ammo, Model = getCharWeaponInSlot(PLAYER_PED, i)
+        sampAddChatMessage(''..weapon..' | '..ammo, -1)
+    end
+    sampAddChatMessage('', -1)
     while true do
         sampGetPlayerSatiety()
         wait(60000)
     end
 end
+
+local weaponFrame  = imgui.OnFrame(
+    function() return weaponWindow[0] end,
+    function(player)
+        imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY - 130), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 1))
+        imgui.SetNextWindowSize(imgui.ImVec2(535, 95), imgui.Cond.FirstUseEver)
+        imgui.Begin("Weapon Window", weaponWindow, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoBackground)
+            imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.36, 0.32, 0.36, 0.50))
+                for i = 1, 6 do
+                    weapon, ammo, Model = getCharWeaponInSlot(PLAYER_PED, i)
+                    if weapon ~= 0 then
+                        slots[i] = weapon
+                        imgui.BeginChild('#weapon-'..weapon..'ammo:'..i, imgui.ImVec2(80, 80), false)
+                            imgui.Image(weapons[weapon], imgui.ImVec2(60, 60), imgui.SetCursorPosX(10), imgui.SetCursorPosY(7))
+                            if weapon == getCurrentCharWeapon(PLAYER_PED) then
+                                if getAmmoInClip() < 10 then
+                                    imgui.Text("    "..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                elseif getAmmoInClip() >= 10 or getAmmoInClip() < 100 then
+                                    imgui.Text("  "..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                elseif getAmmoInClip() >= 100 then
+                                    imgui.Text(""..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                end
+                            end
+                        imgui.EndChild() imgui.SameLine()
+                    else
+                        imgui.BeginChild('#spaceSlot-'..i, imgui.ImVec2(80, 80), false)
+                           
+                        imgui.EndChild() imgui.SameLine()
+                    end
+                    if isKeyJustPressed(49) then
+                        setCurrentCharWeapon(PLAYER_PED, slots[1])
+                    end
+                    if isKeyJustPressed(50) then
+                        setCurrentCharWeapon(PLAYER_PED, slots[2])
+                    end
+                    if isKeyJustPressed(51) then 
+                        setCurrentCharWeapon(PLAYER_PED, slots[3])
+                    end
+                    if isKeyJustPressed(52) then
+                        setCurrentCharWeapon(PLAYER_PED, slots[4])
+                    end
+                    if isKeyJustPressed(53) then 
+                        setCurrentCharWeapon(PLAYER_PED, slots[5])
+                    end
+                    if isKeyJustPressed(54) then 
+                        setCurrentCharWeapon(PLAYER_PED, slots[6])
+                    end
+                end
+            imgui.PopStyleColor(1)
+        imgui.End()
+        player.HideCursor = true
+    end
+)
 
 local hudFrame = imgui.OnFrame(
     function() return hudWindow[0] end,
@@ -87,6 +150,7 @@ function events.onShowDialog(id, style, title, button1, button2, text)
     if text:find("Ваша сытость%: {......}%d+/%d+") and satietyCheck then
         satiety = text:match("Ваша сытость%: {......}(%d+)/%d+")
         satietyCheck = false
+        sampSendDialogResponse(id, 0 , -1, -1)
         return false
     end
 end
@@ -94,6 +158,15 @@ end
 function sampGetPlayerSatiety()
     sampSendChat('/satiety')
     satietyCheck = true
+end
+
+function getAmmoInClip()
+	local pointer = getCharPointer(PLAYER_PED)
+	local weapon = getCurrentCharWeapon(PLAYER_PED)
+	local slot = getWeapontypeSlot(weapon)
+	local offset = pointer + 0x5A0
+	local address = offset + slot * 0x1C
+	return memory.getuint32(address + 0x8)
 end
 
 function styleInit()
