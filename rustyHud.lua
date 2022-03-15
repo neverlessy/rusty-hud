@@ -7,12 +7,17 @@ local fa = require 'fAwesome5'
 local memory = require 'memory'
 local enc = require 'encoding'
 
+script_name('Rusty Hud')
+script_author("neverlessy")
+script_version("0.0.5")
+script_version_number(2205)
+
 local new = imgui.new
 local win = new.bool(false)
 local hudWindow, weaponWindow, settingsWindow = new.bool(), new.bool(), new.bool()
 local sizeX, sizeY = getScreenResolution()
 local weapons, slots = {}, {24, 31, 0, 0, 0, 0}
-local satiety = 0
+local satiety, num = 0, '0'
 local satietyCheck = false
 enc.default = 'CP1251'
 local u8 = enc.UTF8
@@ -29,24 +34,29 @@ imgui.OnInitialize(function()
     imgui.GetIO().Fonts:AddFontFromFileTTF('trebucbd.ttf', 14.0, nil, glyph_ranges_icon)
     local glyph_ranges = imgui.GetIO().Fonts:GetGlyphRangesCyrillic()
     icon = imgui.GetIO().Fonts:AddFontFromFileTTF(getWorkingDirectory()..'/resource/RustyHUD/font/Fa6Pro-solid-900.otf', 16.0, config, iconRanges)
+    font = {
+        [15] = imgui.GetIO().Fonts:AddFontFromFileTTF(getWorkingDirectory()..'/resource/RustyHUD/font/FSM.otf', 18.0, nil, glyph_ranges),
+        [22] = imgui.GetIO().Fonts:AddFontFromFileTTF(getWorkingDirectory()..'/resource/RustyHUD/font/HUDHINT.ttf', 22.0, nil, glyph_ranges),
+    }
     imgui.GetIO().IniFilename = nil
 end)
 
 function main()
+    if not isSampfuncsLoaded() or not isSampLoaded() then return end
     while not isSampAvailable() do wait(0) end
     hudWindow[0], weaponWindow[0] = true, true
-    displayHud(true)
-    sampAddChatMessage(''..getWeapontypeSlot(16), -1)
-    sampRegisterChatCommand('wp', function()
+    displayHud(false)
+    sampGetPlayerSatiety()
+    sampRegisterChatCommand('rusty', function()
+        sampToggleCursor(true)
+        showCursor(true, true)
         settingsWindow[0] = not settingsWindow[0]
     end)
-    while true do
-        sampGetPlayerSatiety()
-        wait(60000)
+    while true do wait(0)
     end
 end
 
-local settingsFrame  = imgui.OnFrame(
+local settingsFrame = imgui.OnFrame(
     function() return settingsWindow[0] end,
     function(player)
         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 1))
@@ -54,6 +64,7 @@ local settingsFrame  = imgui.OnFrame(
         imgui.PushStyleVarFloat(imgui.StyleVar.FrameRounding, 8)
         imgui.PushStyleVarFloat(imgui.StyleVar.WindowRounding, 8)
             imgui.Begin("Settings Window", weaponWindow, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoTitleBar)
+                   imgui.PushFont(font[15])
                     for i = 1, 6 do
                         if imgui.ImageButton(weapons[slots[i]], imgui.ImVec2(60, 60)) then
                             imgui.OpenPopup(u8'Слот '..i)
@@ -74,7 +85,7 @@ local settingsFrame  = imgui.OnFrame(
                             imgui.EndPopup()
                         end
                     end
-                    
+                    imgui.PopFont()
             imgui.End()
         imgui.PopStyleVar(2)
         imgui.ShowCursor = true
@@ -134,9 +145,9 @@ end
 local weaponFrame = imgui.OnFrame(
     function() return weaponWindow[0] end,
     function(player)
-        imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY - 130), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 1))
+        imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY - 15), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 1))
         imgui.SetNextWindowSize(imgui.ImVec2(535, 95), imgui.Cond.FirstUseEver)
-        imgui.Begin("Weapon Window", weaponWindow, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoBackground)
+        imgui.Begin("Weapon Window", weaponWindow, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoBackground + imgui.WindowFlags.NoMove)
             imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.36, 0.36, 0.36, 0.60))
                 for i = 1, 6 do
                         imgui.BeginChild('#slot-'..i, imgui.ImVec2(80, 80), false)
@@ -194,13 +205,50 @@ local weaponFrame = imgui.OnFrame(
     end
 )
 
+function comma_value(n)
+	local left,num,right = string.match(n,'^([^%d]*%d)(%d*)(.-)$')
+	return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
+end
+
+function separator(text)
+	    for S in string.gmatch(text, "%d+") do
+	    	local replace = comma_value(S)
+	    	text = string.gsub(text, S, replace)
+	    end
+	    for S in string.gmatch(text, "%d+") do
+	    	S = string.sub(S, 0, #S-1)
+	    	local replace = comma_value(S)
+	    	text = string.gsub(text, S, replace)
+	    end
+	return text
+end
+
+function imgui.CenterText(text)
+    local width = imgui.GetWindowWidth()
+    local calc = imgui.CalcTextSize(text)
+    imgui.SetCursorPosX( width / 2 - calc.x / 2 )
+    imgui.Text(text)
+end
+
 local hudFrame = imgui.OnFrame(
     function() return hudWindow[0] end,
     function(player)
         imgui.SetNextWindowPos(imgui.ImVec2(sizeX - 15, sizeY - 15), imgui.Cond.FirstUseEver, imgui.ImVec2(1, 1))
-        imgui.SetNextWindowSize(imgui.ImVec2(250, 110), imgui.Cond.FirstUseEver)
+        imgui.SetNextWindowSize(imgui.ImVec2(250, 140), imgui.Cond.FirstUseEver)
         imgui.Begin("Main Window", hudWindow, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoBackground + imgui.WindowFlags.NoMove)
         imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.36, 0.36, 0.36, 0.60))
+            imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.34, 0.76, 0.61, 0.60))
+                imgui.BeginChild('#BarBalance', imgui.ImVec2(230, 26), false)
+                    imgui.PushFont(font[22])
+                    imgui.Text("  $") imgui.SameLine()
+                    if getPlayerMoney(player) > 0 then
+                        imgui.CenterText(u8""..separator(tostring(""..getPlayerMoney(player))))
+                    else
+                        imgui.CenterText(u8"0") 
+                    end
+                    imgui.PopFont()
+                imgui.EndChild()
+            imgui.PopStyleColor()
             imgui.BeginChild('#BarHealth', imgui.ImVec2(230, 26), false)
                     imgui.Text(""..fa.ICON_FA_PLUS, imgui.SetCursorPosY(7), imgui.SetCursorPosX(5))
                     local hp = sampGetPlayerHealth(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
@@ -210,7 +258,9 @@ local hudFrame = imgui.OnFrame(
                     else
                         imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.34, 0.76, 0.61, 0.50))
                     end
-                    imgui.Text(""..hp - 1, imgui.SetCursorPosY(5), imgui.SetCursorPosX(33))
+                    imgui.PushFont(font[15])
+                        imgui.Text(""..hp - 1, imgui.SetCursorPosY(4), imgui.SetCursorPosX(33))
+                    imgui.PopFont()
                     if hp <= 100 then
                         imgui.BeginChild('#BarHealthBar', imgui.ImVec2(hp * 2), imgui.SetCursorPosX(25), imgui.SetCursorPosY(3), false)
                     elseif hp > 100 then
@@ -226,7 +276,9 @@ local hudFrame = imgui.OnFrame(
                     else
                         imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.34, 0.67, 0.75, 0.50))
                     end
-                    imgui.Text(""..armour, imgui.SetCursorPosY(5), imgui.SetCursorPosX(33))
+                    imgui.PushFont(font[15])
+                        imgui.Text(""..armour, imgui.SetCursorPosY(4), imgui.SetCursorPosX(33))
+                    imgui.PopFont()
                     imgui.BeginChild('#BarHealthBar', imgui.ImVec2(armour * 2, 20), imgui.SetCursorPosX(25), imgui.SetCursorPosY(3), false)
                     imgui.EndChild()
                 imgui.PopStyleColor(1)
@@ -238,8 +290,10 @@ local hudFrame = imgui.OnFrame(
                 else
                     imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.85, 0.58, 0.01, 0.50))
                 end
-                imgui.Text(""..satiety, imgui.SetCursorPosY(5), imgui.SetCursorPosX(33))
-                imgui.BeginChild('#BarHealthBar', imgui.ImVec2(satiety * 2, 20), imgui.SetCursorPosX(25), imgui.SetCursorPosY(3), false)
+                imgui.PushFont(font[15])
+                    imgui.Text(""..satiety, imgui.SetCursorPosY(4), imgui.SetCursorPosX(33))
+                imgui.PopFont()
+                imgui.BeginChild('#BarSatietyBars', imgui.ImVec2(satiety * 2, 20), imgui.SetCursorPosX(25), imgui.SetCursorPosY(3), false)
                 imgui.EndChild()
             imgui.EndChild()
         imgui.PopStyleColor(1)
@@ -258,8 +312,13 @@ function events.onShowDialog(id, style, title, button1, button2, text)
 end
 
 function sampGetPlayerSatiety()
-    sampSendChat('/satiety')
-    satietyCheck = true
+    lua_thread.create(function()
+        while true do 
+            sampSendChat('/satiety')
+            satietyCheck = true
+            wait(60000)
+        end
+    end)
 end
 
 function getAmmoInClip()
