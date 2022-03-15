@@ -24,7 +24,7 @@ imgui.OnInitialize(function()
     local iconRanges = imgui.new.ImWchar[3](fa.min_range, fa.max_range, 0)
     imgui.GetIO().Fonts:AddFontFromFileTTF('trebucbd.ttf', 14.0, nil, glyph_ranges_icon)
     local glyph_ranges = imgui.GetIO().Fonts:GetGlyphRangesCyrillic()
-    icon = imgui.GetIO().Fonts:AddFontFromFileTTF(getWorkingDirectory()..'/resource/MiPhone/fonts/Fa6Pro-solid-900.otf', 16.0, config, iconRanges)
+    icon = imgui.GetIO().Fonts:AddFontFromFileTTF(getWorkingDirectory()..'/resource/RustyHUD/font/Fa6Pro-solid-900.otf', 16.0, config, iconRanges)
     imgui.GetIO().IniFilename = nil
 end)
 
@@ -113,7 +113,11 @@ local hudFrame = imgui.OnFrame(
                         imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.34, 0.76, 0.61, 0.50))
                     end
                     imgui.Text(""..hp - 1, imgui.SetCursorPosY(5), imgui.SetCursorPosX(33))
-                    imgui.BeginChild('#BarHealthBar', imgui.ImVec2((hp * 2) - ((hp - 100) * 2), 20), imgui.SetCursorPosX(25), imgui.SetCursorPosY(3), false)
+                    if hp <= 100 then
+                        imgui.BeginChild('#BarHealthBar', imgui.ImVec2(hp * 2), imgui.SetCursorPosX(25), imgui.SetCursorPosY(3), false)
+                    elseif hp > 100 then
+                        imgui.BeginChild('#BarHealthBar', imgui.ImVec2((hp * 2) - ((hp - 100) * 2), 20), imgui.SetCursorPosX(25), imgui.SetCursorPosY(3), false)
+                    end
                     imgui.EndChild()
                 imgui.PopStyleColor(1)
             imgui.EndChild()
