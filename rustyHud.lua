@@ -5,13 +5,17 @@ local vkeys = require 'vkeys'
 local wm = require 'windows.message'
 local fa = require 'fAwesome5'
 local memory = require 'memory'
+local enc = require 'encoding'
 
 local new = imgui.new
-local hudWindow, weaponWindow = new.bool(), new.bool()
+local win = new.bool(false)
+local hudWindow, weaponWindow, settingsWindow = new.bool(), new.bool(), new.bool()
 local sizeX, sizeY = getScreenResolution()
-local weapons, slots = {}, {}
+local weapons, slots = {}, {24, 31, 0, 0, 0, 0}
 local satiety = 0
 local satietyCheck = false
+enc.default = 'CP1251'
+local u8 = enc.UTF8
 
 imgui.OnInitialize(function()
     styleInit()
@@ -32,63 +36,157 @@ function main()
     while not isSampAvailable() do wait(0) end
     hudWindow[0], weaponWindow[0] = true, true
     displayHud(true)
-    for i = 1, 13 do
-        weapon, ammo, Model = getCharWeaponInSlot(PLAYER_PED, i)
-        sampAddChatMessage(''..weapon..' | '..ammo, -1)
-    end
-    sampAddChatMessage('', -1)
+    sampAddChatMessage(''..getWeapontypeSlot(16), -1)
+    sampRegisterChatCommand('wp', function()
+        settingsWindow[0] = not settingsWindow[0]
+    end)
     while true do
         sampGetPlayerSatiety()
         wait(60000)
     end
 end
 
-local weaponFrame  = imgui.OnFrame(
+local settingsFrame  = imgui.OnFrame(
+    function() return settingsWindow[0] end,
+    function(player)
+        imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 1))
+        imgui.SetNextWindowSize(imgui.ImVec2(700, 450), imgui.Cond.FirstUseEver)
+        imgui.PushStyleVarFloat(imgui.StyleVar.FrameRounding, 8)
+        imgui.PushStyleVarFloat(imgui.StyleVar.WindowRounding, 8)
+            imgui.Begin("Settings Window", weaponWindow, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoTitleBar)
+                    for i = 1, 6 do
+                        if imgui.ImageButton(weapons[slots[i]], imgui.ImVec2(60, 60)) then
+                            imgui.OpenPopup(u8'Слот '..i)
+                            sampAddChatMessage('Нажата кнопка '..i, -1)
+                        end imgui.SameLine()
+                        if imgui.BeginPopupModal(u8'Слот '..i, win[0], true, imgui.WindowFlags.NoResize) then
+                            imgui.SetWindowSizeVec2(imgui.ImVec2(400, 600), imgui.Cond.FirstUseEver)
+                            for v = 0, 46 do
+                                if v ~= 19 and v ~= 20 and v ~= 21 then
+                                    if imgui.Button(''..getWeaponNameById(v), imgui.ImVec2(200, 80)) then
+                                        sampAddChatMessage('Для слота '..i..' установлено оружие '..v, -1)
+                                        slots[i] = v
+                                        imgui.CloseCurrentPopup()
+                                    end imgui.SameLine()
+                                    imgui.Image(weapons[v], imgui.ImVec2(80, 80))
+                                end
+                            end
+                            imgui.EndPopup()
+                        end
+                    end
+                    
+            imgui.End()
+        imgui.PopStyleVar(2)
+        imgui.ShowCursor = true
+    end
+)
+
+function getWeaponNameById(model)
+    local names = {
+      [0] = 'Ничего',
+      [1] = 'Кастет',
+      [2] = 'Клюшка для гольфа',
+      [3] = 'Полицейская дубинка',
+      [4] = 'Нож',
+      [5] = 'Бейсбольная бита',
+      [6] = 'Лопата',
+      [7] = 'Кий',
+      [8] = 'Катана',
+      [9] = 'Бензопила',
+      [10] = 'Двухсторонний дилдо',
+      [11] = 'Дилдо',
+      [12] = 'Вибратор',
+      [13] = 'Серебряный вибратор',
+      [14] = 'Букет цветов',
+      [15] = 'Трость',
+      [16] = 'Граната',
+      [17] = 'Слезоточивый газ',
+      [18] = 'Коктейль Молотова',
+      [22] = 'Пистолет 9мм',
+      [23] = 'Пистолет с глушителем',
+      [24] = 'Пустынный орел',
+      [25] = 'Обычный дробовик',
+      [26] = 'Обрез',
+      [27] = 'Скорострельный дробовик',
+      [28] = 'Узи',
+      [29] = 'MP5',
+      [30] = 'Автомат Калашникова',
+      [31] = 'Винтовка M4',
+      [32] = 'Tec-9',
+      [33] = 'Охотничье ружье',
+      [34] = 'Снайперская винтовка',
+      [35] = 'РПГ',
+      [36] = 'Самонаводящиеся ракеты HS',
+      [37] = 'Огнемет',
+      [38] = 'Миниган',
+      [39] = 'Сумка с тротилом',
+      [40] = 'Детонатор к сумке',
+      [41] = 'Баллончик с краской',
+      [42] = 'Огнетушитель',
+      [43] = 'Фотоаппарат',
+      [44] = 'Прибор ночного видения',
+      [45] = 'Тепловизор',
+      [46] = 'Парашют'
+    }
+    return u8(names[model])
+end
+
+local weaponFrame = imgui.OnFrame(
     function() return weaponWindow[0] end,
     function(player)
         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY - 130), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 1))
         imgui.SetNextWindowSize(imgui.ImVec2(535, 95), imgui.Cond.FirstUseEver)
         imgui.Begin("Weapon Window", weaponWindow, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoBackground)
-            imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.36, 0.32, 0.36, 0.50))
+            imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.36, 0.36, 0.36, 0.60))
                 for i = 1, 6 do
-                    weapon, ammo, Model = getCharWeaponInSlot(PLAYER_PED, i)
-                    if weapon ~= 0 then
-                        slots[i] = weapon
-                        imgui.BeginChild('#weapon-'..weapon..'ammo:'..i, imgui.ImVec2(80, 80), false)
-                            imgui.Image(weapons[weapon], imgui.ImVec2(60, 60), imgui.SetCursorPosX(10), imgui.SetCursorPosY(7))
-                            if weapon == getCurrentCharWeapon(PLAYER_PED) then
-                                if getAmmoInClip() < 10 then
-                                    imgui.Text("    "..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
-                                elseif getAmmoInClip() >= 10 or getAmmoInClip() < 100 then
-                                    imgui.Text("  "..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
-                                elseif getAmmoInClip() >= 100 then
-                                    imgui.Text(""..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                        imgui.BeginChild('#slot-'..i, imgui.ImVec2(80, 80), false)
+                            if hasCharGotWeapon(PLAYER_PED, slots[i]) and slots[i] ~= 0 then
+                                imgui.Image(weapons[slots[i]], imgui.ImVec2(60, 60), imgui.SetCursorPosX(10), imgui.SetCursorPosY(7))
+                                weapon, ammo, Model = getCharWeaponInSlot(PLAYER_PED, i)
+                                if getCurrentCharWeapon(PLAYER_PED) == slots[i] then
+                                    if getAmmoInClip() < 10 then
+                                        imgui.Text("    "..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                    elseif getAmmoInClip() >= 10 or getAmmoInClip() < 100 then
+                                        imgui.Text("  "..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                    elseif getAmmoInClip() >= 100 then
+                                        imgui.Text(""..getAmmoInClip(), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                    end
+                                    imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.34, 0.76, 0.61, 0.50))
+                                        imgui.BeginChild('#ammoInClipBar'..i, imgui.ImVec2(4, 80), imgui.SetCursorPosY(0), imgui.SetCursorPosX(0))
+                                        imgui.EndChild()
+                                    imgui.PopStyleColor(1)
+                                else
+                                    if getAmmoInCharWeapon(PLAYER_PED, slots[i]) < 10 then
+                                        imgui.Text("    "..getAmmoInCharWeapon(PLAYER_PED, slots[i]), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                    elseif getAmmoInCharWeapon(PLAYER_PED, slots[i]) >= 10 or getAmmoInCharWeapon(PLAYER_PED, slots[i]) < 100 then
+                                        imgui.Text("  "..getAmmoInCharWeapon(PLAYER_PED, slots[i]), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                    elseif getAmmoInCharWeapon(PLAYER_PED, slots[i]) >= 100 then
+                                        imgui.Text(""..getAmmoInCharWeapon(PLAYER_PED, slots[i]), imgui.SetCursorPosY(63), imgui.SetCursorPosX(56))
+                                    end
                                 end
                             end
                         imgui.EndChild() imgui.SameLine()
-                    else
-                        imgui.BeginChild('#spaceSlot-'..i, imgui.ImVec2(80, 80), false)
-                           
-                        imgui.EndChild() imgui.SameLine()
-                    end
-                    if isKeyJustPressed(49) then
-                        setCurrentCharWeapon(PLAYER_PED, slots[1])
-                    end
-                    if isKeyJustPressed(50) then
-                        setCurrentCharWeapon(PLAYER_PED, slots[2])
-                    end
-                    if isKeyJustPressed(51) then 
-                        setCurrentCharWeapon(PLAYER_PED, slots[3])
-                    end
-                    if isKeyJustPressed(52) then
-                        setCurrentCharWeapon(PLAYER_PED, slots[4])
-                    end
-                    if isKeyJustPressed(53) then 
-                        setCurrentCharWeapon(PLAYER_PED, slots[5])
-                    end
-                    if isKeyJustPressed(54) then 
-                        setCurrentCharWeapon(PLAYER_PED, slots[6])
-                    end
+                end
+                if isKeyJustPressed(48) then
+                    setCurrentCharWeapon(PLAYER_PED, 0)
+                end
+                if isKeyJustPressed(49) then
+                    setCurrentCharWeapon(PLAYER_PED, slots[1])
+                end
+                if isKeyJustPressed(50) then
+                    setCurrentCharWeapon(PLAYER_PED, slots[2])
+                end
+                if isKeyJustPressed(51) then 
+                    setCurrentCharWeapon(PLAYER_PED, slots[3])
+                end
+                if isKeyJustPressed(52) then
+                    setCurrentCharWeapon(PLAYER_PED, slots[4])
+                end
+                if isKeyJustPressed(53) then 
+                    setCurrentCharWeapon(PLAYER_PED, slots[5])
+                end
+                if isKeyJustPressed(54) then 
+                    setCurrentCharWeapon(PLAYER_PED, slots[6])
                 end
             imgui.PopStyleColor(1)
         imgui.End()
@@ -102,7 +200,7 @@ local hudFrame = imgui.OnFrame(
         imgui.SetNextWindowPos(imgui.ImVec2(sizeX - 15, sizeY - 15), imgui.Cond.FirstUseEver, imgui.ImVec2(1, 1))
         imgui.SetNextWindowSize(imgui.ImVec2(250, 110), imgui.Cond.FirstUseEver)
         imgui.Begin("Main Window", hudWindow, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoBackground + imgui.WindowFlags.NoMove)
-        imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.36, 0.32, 0.36, 0.50))
+        imgui.PushStyleColor(imgui.Col.ChildBg, imgui.ImVec4(0.36, 0.36, 0.36, 0.60))
             imgui.BeginChild('#BarHealth', imgui.ImVec2(230, 26), false)
                     imgui.Text(""..fa.ICON_FA_PLUS, imgui.SetCursorPosY(7), imgui.SetCursorPosX(5))
                     local hp = sampGetPlayerHealth(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
@@ -188,6 +286,7 @@ function styleInit()
       style.WindowBorderSize = 0.0
       style.FrameRounding = 0.0
       style.ButtonTextAlign = imgui.ImVec2(0.03, 0.5)
+      style.PopupRounding = 10.0
   
       colors[clr.Text] = ImVec4(0.80, 0.80, 0.83, 1.00);
       colors[clr.TextDisabled] = ImVec4(0.24, 0.23, 0.29, 1.00);
